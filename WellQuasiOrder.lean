@@ -1,5 +1,6 @@
 import Mathlib.Tactic
 import Mathlib.Order.Antichain
+import Mathlib.Data.Set.Card
 
 variable {α : Type*} [hp: Preorder α] {x y z : α} {A : Set α}
 
@@ -154,13 +155,163 @@ theorem WQO_of_no_infinite_antichain_or_descending_chain
   have h0:= Set.infinite_range_of_injective hinj
   contradiction
 
+lemma finite_range_of_not_injective [Infinite α] (f:α→β) (hf : (range f).Finite):
+    ¬ (Function.Injective f):=by
+  by_contra hcon
+  have h0:=Set.infinite_range_of_injective hcon
+  tauto
+
+theorem WQO_of_increasing_subsequence
+    (h_inc : ∀ (f : ℕ → α), ∃ (g:ℕ→ℕ), (StrictMono g)∧ (∀ i j, i < j → f (g i) ≤  f (g j))) : IsWQO α := by
+  refine ⟨?_⟩
+  intro f
+  obtain⟨ g,hg,hij⟩ :=h_inc f
+  use (g 0),(g 1)
+  have h01:0<1:=by trivial
+  simp[hg (h01)]
+  simp[hij 0 1 h01]
+
+theorem increasing_subsequence (α : Type*) [Preorder α] [IsWQO α] :
+    ∀ (f : ℕ → α), ∃ (g:ℕ→ℕ), (StrictMono g)∧ (∀ i j, i < j → f (g i) ≤  f (g j)) := by
+  intro f
+  obtain ⟨a, ha_mono, (ha|ha)⟩ := ramseyGraph (fun i j ↦ f i ≤  f j)
+  use a
+  obtain ⟨b, hb_mono, (hb|hb)⟩ := ramseyGraph (fun i j ↦ f (a j) <  f (a i))
+  have h_desc:=not_exists_descending_chain α
+  by_contra!
+  apply h_desc
+  use f∘ a ∘ b
+  simp
+  intro i j hij
+  exact hb hij
+  have hc:IsAntichain (· ≤ ·) (range (f ∘ a∘ b)):=by
+    rw [isAntichain_iff_forall_le_imp_eq]
+    simp
+    intro i j hfij
+    obtain (hij|hij):= lt_or_le i j
+    have hbij:=hb_mono hij
+    apply ha at hbij
+    tauto
+    obtain (hij|hij):=hij.eq_or_lt
+    tauto
+    have hbij:=hb_mono hij
+    apply ha at hbij
+    apply hb at hij
+    rw[Preorder.lt_iff_le_not_le,not_and,not_not] at hij
+    apply hij at hfij
+    tauto
+  have hac:= IsAntichain.Finite hc
+  have h0:= finite_range_of_not_injective (f∘ a∘ b) hac
+  rw[Function.not_injective_iff] at h0
+  obtain⟨x,y,hfxy,hxy⟩ :=h0
+  obtain(hxy|hyx):=Nat.lt_or_gt.1 hxy
+  apply hb_mono at hxy
+  have ha0:=ha hxy
+  simp at hfxy
+  have hfxy:=hfxy.le
+  contradiction
+  apply hb_mono at hyx
+  have ha0:=ha hyx
+  simp at hfxy
+  have hfyx:=hfxy.symm.le
+  contradiction
+
 section product
 
+
+
+
 instance WQO.Prod {α β : Type*} [Preorder α] [Preorder β] [IsWQO α] [IsWQO β] : IsWQO (α × β) := by
-  refine ⟨?_⟩
-  simp_rw [Prod.le_def]
-  -- you can prove this in a similar way to the previous lemma. You will need Ramsey
-  sorry
+  suffices h_inc : ∀ (f : ℕ → α×β ), ∃ (g:ℕ→ℕ), (StrictMono g)∧ (∀ i j, i < j → f (g i) ≤  f (g j))
+  exact WQO_of_increasing_subsequence h_inc
+  intro f
+  set f1:=(fun x=>(f x).1) with hf1
+  have hf1:=increasing_subsequence α f1
+  obtain ⟨g1,hg1_mono,hg1⟩:=hf1
+  set f2:=(fun x=>(f (g1 x)).2) with hf2
+  have hf2:=increasing_subsequence β f2
+  obtain ⟨g2,hg2_mono,hg2⟩:=hf2
+  use g1∘ g2
+  simp[StrictMono.comp hg1_mono hg2_mono]
+  intro i j hij
+  have hgij:=hg2_mono hij
+  have h1:=hg1 (g2 i) (g2 j) hgij
+  have h2:=hg2 i j hij
+  simp[hf1] at h1
+  simp[hf2] at h2
+  trivial
+
+def fin_restrict {i d:ℕ } (hi:i<d): Fin d where
+  val:= i
+  isLt:= hi
+
+def fin_prod {α: Type*} [Preorder α]  {d:ℕ} :
+    OrderIso (Fin (d + 1) → α) ((Fin (d) → α)× α) where
+
+  toFun:=by
+    exact (fun x=> ((fun i=>(x i)),(x d)))
+  invFun:=(fun (x,y)=>(fun i=> if hi:i.val<d then (x (fin_restrict hi)) else y))
+  left_inv:=by
+    unfold Function.LeftInverse
+    intro x
+    simp
+    ext i
+    obtain(hi|hi):=lt_or_ge i.val d
+    simp[hi]
+    trivial
+    have := i.isLt
+    have hi0:i.val=d:=by linarith
+    unfold fin_restrict
+    simp[hi]
+    have hi1:(d:Fin (d+1))= i:= by
+      have hi1:(d:Fin (d+1)).val = i.val:=by
+        simp[hi0]
+      exact Fin.eq_of_val_eq hi1
+    rw[← hi1]
+    simp
+  right_inv:=by
+    unfold Function.RightInverse
+    intro x
+    simp
+    ext i
+    simp
+    unfold fin_restrict
+    simp
+    simp
+  map_rel_iff':=by
+    intro a b
+    simp
+    constructor
+    intro h0
+    obtain⟨h1,h2⟩:=h0
+    have :∀ i, (a i)≤ (b i):=by
+      intro i
+      obtain(hi|hi):=lt_or_ge i.val d
+      have h2:= h1 (fin_restrict hi)
+      simp at h2
+      have h3:(fin_restrict hi).castSucc=i:= by
+        have h4:(fin_restrict hi).castSucc.val=i.val:= by trivial
+        exact Fin.eq_of_val_eq h4
+      rw[← h3]
+      exact h2
+      have hi:i.val =d :=by linarith [i.isLt]
+      have h3:(Fin.last d)=i:=by
+        unfold Fin.last
+        exact Fin.eq_of_val_eq hi.symm
+      rw[h3] at h2
+      exact h2
+    trivial
+    intro hab
+    constructor
+    have :∀ j, (fun (i:Fin d) ↦ a i.castSucc) j ≤ (fun i ↦ b i.castSucc) j:=by
+      intro j
+      simp
+      exact hab j.castSucc
+    trivial
+    exact hab (Fin.last d)
+
+
+
 
 
 /- *BONUS*
@@ -168,6 +319,28 @@ instance WQO.Prod {α β : Type*} [Preorder α] [Preorder β] [IsWQO α] [IsWQO 
 This is mathematically just an induction using the previous fact, but setting it up correctly
 is likely a challenge. -/
 instance WQO.tuple {α : Type*} [Preorder α] [IsWQO α] : IsWQO (Fin n → α) := by
-  sorry
+  induction n with
+  | zero=>
+    refine ⟨?_⟩
+    intro f
+    by_contra! hcon
+    simp at hcon
+    have:=hcon 1 2
+    tauto
+  |succ d hd =>
+    refine ⟨?_⟩
+    by_contra! hcon
+    obtain⟨f,hf⟩:=hcon
+    have h0:∃ f:ℕ→((Fin (d) → α)× α), ∀ (i j : ℕ), i < j → ¬ (f i) ≤ (f j):=by
+      use fin_prod∘f
+      simp
+      exact hf
+    have h1:IsWQO ((Fin (d) → α)× α):=WQO.Prod
+    have h2:=h1.forall_seq_exists_le
+    obtain⟨g,hg⟩:=h0
+    have h3:= h2 g
+    obtain⟨ i,j,hij,hgij⟩:=h3
+    have h4:= hg i j hij
+    contradiction
 
 end product
