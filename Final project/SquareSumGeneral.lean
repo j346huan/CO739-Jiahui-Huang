@@ -20,7 +20,7 @@ Theorem: A natural number is a sum of squares if and only if its prime factoriza
 def IsSumSquare (n:ℕ): Prop:= ∃ x y, n=x^2+y^2
 
 /-
-Recall the theorem for the prime case. I will exlude the proof so that I do not have to import the whole file.
+Recall the theorem for the prime case. I will exclude the proof so that I do not have to import the whole file.
 -/
 lemma exists_sum_squares (hp : (p:ℕ).Prime) (hpk : p = 4 * k + 1) : ∃ (a b : ℤ), p = a^2 + b^2 :=sorry
 /-
